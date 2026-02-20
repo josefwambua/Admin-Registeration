@@ -33,6 +33,6 @@ class PostController extends Controller
         ]);
 
         return redirect()->route('posts.create')
-            ->with('success', 'Post submitted successfully!');
+            ->with('success', 'Hoooray, we will reach back to you soon! Thank you for your submission.');
     }
 }
