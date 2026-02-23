@@ -4,35 +4,60 @@ namespace App\Http\Controllers;
 
 use App\Models\Post;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class PostController extends Controller
 {
-    // Show the public form
     public function create()
     {
         return view('posts.create');
     }
 
-    // Handle form submission
     public function store(Request $request)
     {
+        // ── Validate ───────────────────────────────────────────────────────
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title'       => 'required|string|max:255',
             'description' => 'required|string',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image'       => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
         ]);
 
-        // Upload image
-        $imagePath = $request->file('image')->store('posts', 'public');
+        // ── Handle image upload ────────────────────────────────────────────
+        if ($request->hasFile('image')) {
+            $validated['image'] = $request->file('image')->store('posts', 'public');
+        }
 
-        // Create post
-        Post::create([
-            'title' => $validated['title'],
-            'description' => $validated['description'],
-            'image' => $imagePath,
-        ]);
+        // ── Save post ──────────────────────────────────────────────────────
+        $post = Post::create($validated);
 
-        return redirect()->route('posts.create')
-            ->with('success', 'Hoooray, we will reach back to you soon! Thank you for your submission.');
+        // ── Notify admin via email ─────────────────────────────────────────
+        $adminEmail = config('mail.admin_email', env('ADMIN_EMAIL'));
+
+        $details = [
+            'title'        => $post->title,
+            'description'  => $post->description,
+            'submitted_by' => auth()->check()
+                                ? auth()->user()->name . ' (' . auth()->user()->email . ')'
+                                : 'Guest',
+            'submitted_at' => now()->format('D, d M Y \a\t H:i A'),
+            'view_url'     => route('posts.show', $post->id),
+        ];
+
+        Mail::send(
+            'emails.new-post-notification',
+            $details,
+            function ($message) use ($adminEmail, $post) {
+                $message->to($adminEmail)
+                        ->subject('📬 New Post Submitted: ' . $post->title);
+            }
+        );
+
+        return redirect()->back()->with('success', 'Your post has been submitted successfully!');
+    }
+
+    public function show(Post $post)
+    {
+        return view('posts.show', compact('post'));
     }
 }

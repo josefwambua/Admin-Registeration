@@ -8,3 +8,4 @@ Route::get('/', [PostController::class, 'create'])->name('posts.create');
 
 // Form submission
 Route::post('/submit-post', [PostController::class, 'store'])->name('posts.store');
+Route::get('/posts/{post}', [PostController::class, 'show'])->name('posts.show');
